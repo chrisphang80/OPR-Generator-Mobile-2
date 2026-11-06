@@ -135,7 +135,20 @@ textarea{min-height:88px;resize:vertical}
   </div>
   <div class="grid">
     <div class="field"><label id="ui_lblSchool">Nama sekolah / organisasi</label><input id="school" value="SJK(C) Chung Hua Rantau"></div>
-    <div class="field"><label id="ui_lblProgram">Nama program</label><input id="program"></div>
+    <div class="field full" style="background: linear-gradient(135deg, #eff6ff, #dbeafe); border: 2px solid #3b82f6; padding: 14px; border-radius: 12px; margin-bottom: 12px;">
+  <label id="ui_lblProgram" style="color: #1e40af; font-size: 15px; font-weight: 800; display: flex; align-items: center; gap: 6px;">
+    ✏️ 老师输入活动题目 (Nama Program) 
+  </label>
+  <div style="display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap;">
+    <input id="program" placeholder="输入任何活动名称（例如：五年级科学探究比赛 / Kem Motivasi / 反毒讲座）" style="flex: 1; min-width: 240px; font-size: 15px; font-weight: 600; border-color: #3b82f6;">
+    <button type="button" class="btn ai-btn" id="btnAIFill" onclick="aiAutoFillFromTitle()" style="background: linear-gradient(135deg, #2563eb, #7c3aed); color: #fff; font-size: 14px; padding: 10px 18px; border-radius: 9px; font-weight: 800; cursor: pointer; border: none; box-shadow: 0 4px 12px rgba(37,99,235,0.3);">
+      ✨ AI 智能推导填满所有 OPR 内容
+    </button>
+  </div>
+  <div class="hint" style="color: #1e40af; font-size: 12.5px; margin-top: 6px; font-weight: 600;" id="ui_aiHint">
+    💡 提示：老师只需在此输入活动题目，点击右侧 AI 按钮，系统将根据题目全自动填满下方所有 18 项 OPR Report 事项！
+  </div>
+</div>
     <div class="field"><label id="ui_lblDate">Tarikh & hari</label><input id="date"></div>
     <div class="field"><label id="ui_lblVenue">Tempat</label><input id="venue"></div>
     <div class="field"><label id="ui_lblStart">Masa mula</label><input id="start"></div>
@@ -1913,6 +1926,201 @@ const uiText={
 const $=id=>document.getElementById(id);
 let currentLang='zh';
 
+
+/* ===== AI 智能根据题目自动推导并填满 OPR 内容 ===== */
+function aiAutoFillFromTitle() {
+  const title = $('program').value.trim();
+  if (!title) {
+    alert(currentLang === 'zh' ? '请先在输入框中填入活动题目！' : (currentLang === 'ms' ? 'Sila masukkan nama program terlebih dahulu!' : 'Please enter the programme name first!'));
+    return;
+  }
+
+  // 1. 尝试在现有 70 个预设数据库中匹配
+  const keys = Object.keys(presets);
+  let matchedKey = null;
+  const inputLower = title.toLowerCase();
+
+  for (const k of keys) {
+    const p = presets[k];
+    const tZh = (p.title && (p.title.zh || p.title) || '').toLowerCase();
+    const tMs = (p.title && (p.title.ms || p.title) || '').toLowerCase();
+    const tEn = (p.title && (p.title.en || p.title) || '').toLowerCase();
+
+    if ((tZh && (tZh.includes(inputLower) || inputLower.includes(tZh))) ||
+        (tMs && (tMs.includes(inputLower) || inputLower.includes(tMs))) ||
+        (tEn && (tEn.includes(inputLower) || inputLower.includes(tEn)))) {
+      matchedKey = k;
+      break;
+    }
+  }
+
+  if (matchedKey) {
+    $('presetSelect').value = matchedKey;
+    autoFillPreset();
+    $('program').value = title; // 保留教师输入的精确题目
+    alert(currentLang === 'zh' ? '✨ 已自动匹配预设数据库，并成功填满全页 OPR 事项！' : '✨ Matched database preset and auto-filled all OPR fields!');
+    return;
+  }
+
+  // 2. 若无预设，触发动态 AI 推理逻辑引擎
+  const lang = getLangKey();
+  const generated = generateSmartOPRData(title, lang);
+
+  $('school').value = $('school').value || 'SJK(C) Chung Hua Rantau';
+  $('program').value = title;
+
+  if (!$('date').value) {
+    const d = new Date();
+    $('date').value = `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
+  }
+  if (!$('start').value) $('start').value = '8:00 AM';
+  if (!$('end').value) $('end').value = '11:30 AM';
+
+  $('venue').value = generated.venue;
+  $('organizer').value = generated.organizer;
+  $('target').value = generated.target;
+  $('attendance').value = generated.attendance;
+
+  $('implementation').value = generated.implementation;
+  $('objectives').value = generated.objectives;
+  $('impact').value = generated.impact;
+  $('evidence').value = generated.evidence;
+  $('strengths').value = generated.strengths;
+  $('challenges').value = generated.challenges;
+  $('suggestions').value = generated.suggestions;
+  $('officer').value = generated.officer;
+  $('duration').value = generated.duration;
+
+  if (!$('preparedName').value) $('preparedName').value = generated.preparedName;
+  if (!$('preparedRole').value) $('preparedRole').value = generated.preparedRole;
+  if (!$('preparedDate').value) $('preparedDate').value = $('date').value;
+  if (!$('verifiedName').value) $('verifiedName').value = generated.verifiedName;
+  if (!$('verifiedRole').value) $('verifiedRole').value = generated.verifiedRole;
+  if (!$('verifiedDate').value) $('verifiedDate').value = $('date').value;
+
+  alert(currentLang === 'zh' ? '✨ AI 已根据您的活动题目，全自动推导并填满所有 18 项 OPR 内容！' : '✨ AI successfully auto-filled all OPR fields based on your title!');
+}
+
+function generateSmartOPRData(title, lang) {
+  const lower = title.toLowerCase();
+  
+  // 1. 智能地点与场景识别
+  let venue = '';
+  let isOffCampus = false;
+  let type = 'general';
+
+  // 地点与类型判定
+  if (lower.match(/lawatan|visit|参访|参观|游学|户外教学|rombingan/)) {
+    isOffCampus = true;
+    type = 'excursion';
+    venue = lang === 'zh' ? '校外指定参访地点（如：博物馆/科技馆/植物园/工厂）' : 'Lokasi Lawatan (Cth: Muzium / Pusat Sains / Kilang)';
+  } else if (lower.match(/daerah|negeri|kebangsaan|mssd|mssm|mssns|校际|县级|州级|全国/)) {
+    isOffCampus = true;
+    type = 'external_comp';
+    venue = lang === 'zh' ? '校外竞赛场馆（如：县级/州级体育馆/指定主办学校）' : 'Stadium / Dewan Pengelola Peringkat Daerah/Negeri';
+  } else if (lower.match(/renang|kolam|akuatik|swimming|水上/)) {
+    isOffCampus = true;
+    type = 'aquatic';
+    venue = lang === 'zh' ? '水上运动中心 / 游泳池 (Pusat Akuatik)' : 'Pusat Akuatik / Kolam Renang';
+  } else if (lower.match(/kem|perkhemahan|hutan|outdoor|野营|露营地/)) {
+    isOffCampus = true;
+    type = 'outdoor_camp';
+    venue = lang === 'zh' ? '户外课外活动营地 / Kem Tangkok / Pusat Kokurikulum' : 'Pusat Kokurikulum / Kem Hutan';
+  } else if (lower.match(/pantai|beach|komuniti|rumah kebajikan|海滩|老人院|孤儿院|社区/)) {
+    isOffCampus = true;
+    type = 'community';
+    venue = lang === 'zh' ? '校外社区中心 / 关怀机构 / 海滩' : 'Pusat Komuniti / Rumah Kebajikan / Pantai';
+  } else if (lower.match(/sukan|bola|lari|olahraga|lompat|ping pong|badminton|运动|球|赛跑|田径/)) {
+    type = 'sports';
+    venue = lang === 'zh' ? '晏斗中华小学大草场 / 体育角' : 'Padang / Gelanggang SJKC Chung Hua Rantau';
+  } else if (lower.match(/kantin|makanan|kuliner|搓汤圆|食堂/)) {
+    type = 'canteen';
+    venue = lang === 'zh' ? '晏斗中华小学食堂' : 'Kantin SJKC Chung Hua Rantau';
+  } else if (lower.match(/komputer|ict|digital|数码|电脑/)) {
+    type = 'lab';
+    venue = lang === 'zh' ? '晏斗中华小学电脑室' : 'Bilik Komputer SJKC Chung Hua Rantau';
+  } else if (lower.match(/perpustakaan|nilam|bacaan|图书|阅读/)) {
+    type = 'library';
+    venue = lang === 'zh' ? '晏斗中华小学图书馆' : 'Pusat Sumber SJKC Chung Hua Rantau';
+  } else if (lower.match(/bilik darjah|kelas|bertulis|kuiz|硬笔|笔试|课室/)) {
+    type = 'classroom';
+    venue = lang === 'zh' ? '晏斗中华小学课室' : 'Bilik Darjah SJKC Chung Hua Rantau';
+  } else {
+    type = 'hall_general';
+    venue = lang === 'zh' ? '晏斗中华小学礼堂' : 'Dewan SJKC Chung Hua Rantau';
+  }
+
+  // 2. 根据识别出的地点类型生成符合逻辑的报告事项
+  if (lang === 'zh') {
+    if (type === 'excursion') {
+      return {
+        venue: venue, organizer: '学生事务处与相关学科组', target: '三至六年级学生', attendance: '80 人',
+        implementation: `本校特别组织“${title}”校外参观活动，安排专车巴士接送学生前往现场，进行实地考察、专业讲解与互动体验。`,
+        objectives: `拓展学生的视野，将课本知识与现实生活紧密结合。\n培养学生在校外的团队纪律性与公共文明礼仪。\n丰富课外实践经验，激发对探索未知的兴趣。`,
+        impact: `学生通过实地观察获得了直观的知识体验。\n强化了集体出游的安全意识与纪律守则。\n获得了随行教师与参访单位的高度赞赏。`,
+        evidence: '校外活动申请批文、巴士租用记录、现场研学照片、学生参访报告',
+        strengths: '带队教师分工明确，行程安排紧凑顺畅，学生安全措施到位。',
+        challenges: '校外交通车程受路况影响，需严格管控各环节集合时间。',
+        suggestions: '建议下次活动提前与参访单位协商深度导览时段，并备齐随车急救药品。',
+        officer: '带队协调教师', duration: '1 天 (全天)',
+        preparedName: '带队负责老师', preparedRole: '校外活动协调员', verifiedName: '黄秀玲校长', verifiedRole: '晏斗中华小学校长'
+      };
+    } else if (type === 'external_comp') {
+      return {
+        venue: venue, organizer: '课外活动处与校队教练组', target: '校队代表选手', attendance: '20 人',
+        implementation: `本校派出代表队前往校外赛场参加“${title}”，选手们在领队老师带领下提前抵达场馆适应场地并开展赛前热身。`,
+        objectives: `代表学校在校际比赛中角逐荣誉，检验平日训练成效。\n提高选手在校外高强度竞赛中的临场心理素质。\n增进与其他兄弟学校选手之间的切磋与交流。`,
+        impact: `选手们奋勇拼搏，展现了极佳的竞技水平与体育道德。\n成功为学校赢得多项奖项，提升了校园声誉。\n积累了宝贵的校外大型赛事对战经验。`,
+        evidence: '外赛报名表、比赛成绩册、获胜奖状/奖牌、现场比赛记录照片',
+        strengths: '领队老师与教练现场指导到位，选手斗志昂扬。',
+        challenges: '适应异地场地的时间较短，交通与午餐安排需细致协调。',
+        suggestions: '建议提早安排场地熟悉练习，并为外赛选手准备充足的后勤补给。',
+        officer: '校队领队老师', duration: '1 天',
+        preparedName: '校队领队老师', preparedRole: '竞赛负责老师', verifiedName: '黄秀玲校长', verifiedRole: '晏斗中华小学校长'
+      };
+    } else if (type === 'sports') {
+      return {
+        venue: venue, organizer: '体育组与课外活动处', target: '全体师生', attendance: '180 人',
+        implementation: `本校在草场举行“${title}”，设置了竞赛区与观赛区，组织学生开展有序的体育竞技与体能比拼。`,
+        objectives: `提升学生的体能素质、反应敏捷度与运动技能。\n培养遵规守纪、团队协作与永不放弃的体育精神。\n选拔优秀运动苗子充实校队阵容。`,
+        impact: `全校学生踊跃参与，现场气氛热烈。\n显著增强了校园健康体育风气与班级凝聚力。\n顺利选拔出优秀选手。`,
+        evidence: '比赛成绩表、得分排行榜、现场活动照片',
+        strengths: '裁判工作公正高效，参赛选手士气高昂，赛场秩序良好。',
+        challenges: '户外天气较炎热，需防范学生中暑与体能过度消耗。',
+        suggestions: '建议场地旁加设遮阳帐篷，并准备充足的饮用水与防晒物资。',
+        officer: '张志明老师', duration: '1 天',
+        preparedName: '张志明老师', preparedRole: '体育主教练 / 协调员', verifiedName: '黄秀玲校长', verifiedRole: '晏斗中华小学校长'
+      };
+    } else {
+      return {
+        venue: venue, organizer: '校方筹委会', target: '全体师生', attendance: '180 人',
+        implementation: `本校于场地顺利举办“${title}”，通过丰富多元的活动环节，让学生在有意义的实践中学习与成长。`,
+        objectives: `达成本活动既定的教育目标，拓展学生视野。\n培养团队合作能力与实践能力。\n营造积极健康的校园文化氛围。`,
+        impact: `活动圆满举行，取得了良好的教育效果。\n学生参与积极性高，收获了宝贵的体验。\n获得了师生的一致认可。`,
+        evidence: '活动签到表、现场记录照片、成果汇编',
+        strengths: '筹备充分，师生配合默契，活动流程顺畅。',
+        challenges: '场地空间与时间调控需更加精确。',
+        suggestions: '建议提前优化流程细节，确保活动更加高效有序。',
+        officer: '活动负责老师', duration: '半天',
+        preparedName: '负责老师', preparedRole: '活动协调员', verifiedName: '黄秀玲校长', verifiedRole: '晏斗中华小学校长'
+      };
+    }
+  } else {
+    return {
+      venue: venue, organizer: 'Pihak Pengurusan Sekolah', target: 'Semua murid dan guru', attendance: '180 orang',
+      implementation: `Pihak sekolah telah menganjurkan "${title}" bertempat di ${venue} bagi memupuk potensi dan pengalaman amali murid.`,
+      objectives: `Mencapai objektif program serta meningkatkan kemahiran dan disiplin murid.\nMemupuk nilai murni dan semangat bekerjasama.`,
+      impact: `Program berjalan lancar dan mencapai matlamat yang ditetapkan dengan penyertaan aktif.`,
+      evidence: 'Foto dokumentasi, borang kehadiran, rekod pencapaian',
+      strengths: 'Pengurusan masa dan kawalan keselamatan yang teratur.',
+      challenges: `Kawalan logistik di ${isOffCampus ? 'luar kawasan sekolah' : 'kawasan aktiviti'}.`,
+      suggestions: 'Cadangan persediaan diawalkan bagi memastikan kelancaran program.',
+      officer: 'Guru Penyelaras', duration: '1 Hari',
+      preparedName: 'GURU PENYELARAS', preparedRole: 'Penyelaras Program', verifiedName: 'PN. WONG SIEW LING', verifiedRole: 'Guru Besar SJK(C) Chung Hua Rantau'
+    };
+  }
+}
+
 function switchLanguage(lang){
   currentLang=lang;
   document.querySelectorAll('.lang-btn').forEach(b=>b.classList.toggle('active',b.dataset.lang===lang));
@@ -2130,6 +2338,7 @@ ${val('extra')}
 Use ${val('language')} for all visible text. Do not invent facts.`;
 }
 
+$('program').addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); aiAutoFillFromTitle(); } });
 $('category').onchange=fillDesigns;
 $('design').onchange=updatePreview;
 $('palette').onchange=updatePreview;
